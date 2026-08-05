@@ -50,6 +50,11 @@ document.getElementById("joinBtn").addEventListener("click", () => {
       errorLabel.textContent = res.error;
       return;
     }
+    // sessionId 저장
+    if (res.sessionId) {
+      localStorage.setItem("sessionId", res.sessionId);
+      localStorage.setItem("roomCode", code);
+    }
     errorLabel.textContent = "";
     joinSection.style.display = "none";
     waitingSection.style.display = "block";
