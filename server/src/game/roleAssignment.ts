@@ -1,4 +1,4 @@
-import { MAX_HP, Player, ROLE_COMPOSITION } from "./types.js";
+import { MAX_HP, Player, ROLE_COMPOSITION, defaultAbilityState } from "./types.js";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -26,6 +26,7 @@ export function assignRoles(
       role,
       hp: MAX_HP[role],
       alive: true,
+      abilities: defaultAbilityState(),
     };
   });
 }

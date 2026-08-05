@@ -22,7 +22,7 @@ export function createRoom(hostId: string): Room {
     players: [],
     round: 0,
     phase: "lobby",
-    nightTargets: {},
+    nightActions: {},
     dayVotes: {},
     lastNightDamage: [],
     lastVoteResult: null,

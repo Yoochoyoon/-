@@ -33,10 +33,18 @@
       <span class="muted" id="hpLabel"></span>
     </div>
 
+    <div id="spyRevealSection" class="card" style="display:none; border:1px solid #f2c94c;">
+      <span class="muted">스파이 동료 (1라운드 정찰 결과)</span>
+      <ul id="spyTeammateList" class="player-list"></ul>
+    </div>
+
     <div id="gameSection" class="card" style="display:none">
       <h2 id="phaseLabel"></h2>
       <div class="timer" id="timerLabel">--:--</div>
       <p class="muted" id="instructionLabel"></p>
+      <p id="beginnerHint" style="display:none; color:#f2c94c;"></p>
+      <ul id="actionChoices" class="player-list" style="display:none"></ul>
+      <ul id="shieldModeChoices" class="player-list" style="display:none"></ul>
       <ul id="targetList" class="player-list"></ul>
       <button id="submitBtn" style="display:none">지목 확정</button>
     </div>

@@ -8,12 +8,47 @@ export type Phase =
   | "day_vote"
   | "game_over";
 
+export type NightActionType =
+  | "attack"
+  | "boss_execute"
+  | "bodyguard_shield"
+  | "bodyguard_oath"
+  | "spy_disrupt"
+  | "traitor_smile";
+
+export type ShieldMode = "absorb" | "halve";
+
+export interface NightAction {
+  actionType: NightActionType;
+  targetId?: string;
+  shieldMode?: ShieldMode;
+}
+
+export interface PlayerAbilityState {
+  bossExecuteUsed: boolean;
+  bodyguardOathUsed: boolean;
+  bodyguardShieldLastUsedRound: number | null;
+  spyDisruptUsed: boolean;
+  traitorSmileUsed: boolean;
+}
+
+export function defaultAbilityState(): PlayerAbilityState {
+  return {
+    bossExecuteUsed: false,
+    bodyguardOathUsed: false,
+    bodyguardShieldLastUsedRound: null,
+    spyDisruptUsed: false,
+    traitorSmileUsed: false,
+  };
+}
+
 export interface Player {
   id: string;
   nickname: string;
   role: Role | null;
   hp: number;
   alive: boolean;
+  abilities: PlayerAbilityState;
 }
 
 export interface DamageEntry {
@@ -27,7 +62,7 @@ export interface Room {
   players: Player[];
   round: number;
   phase: Phase;
-  nightTargets: Record<string, string>;
+  nightActions: Record<string, NightAction>;
   dayVotes: Record<string, string>;
   lastNightDamage: DamageEntry[];
   lastVoteResult: { targetId: string | null; tie: boolean } | null;

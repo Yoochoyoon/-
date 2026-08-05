@@ -1,7 +1,17 @@
 import type { Server, Socket } from "socket.io";
 import { assignRoles } from "./game/roleAssignment.js";
 import { checkWinner, resolveDayVote, resolveNightAttacks } from "./game/resolveRound.js";
-import { PHASE_DURATIONS_MS, Phase, Role, Room, ROLE_COMPOSITION } from "./game/types.js";
+import {
+  NightAction,
+  NightActionType,
+  PHASE_DURATIONS_MS,
+  Phase,
+  Player,
+  Role,
+  Room,
+  ROLE_COMPOSITION,
+  defaultAbilityState,
+} from "./game/types.js";
 import { createRoom, deleteRoom, getRoom } from "./rooms.js";
 
 const ROOM_SIZE = ROLE_COMPOSITION.length;
@@ -29,6 +39,51 @@ function emitState(io: Server, room: Room) {
     round: room.round,
     phaseEndsAt: room.phaseEndsAt,
   });
+}
+
+/**
+ * 2라운드 이후 밤에 이 플레이어가 고를 수 있는 행동 목록을 계산한다
+ * (04핵심메커니즘.md: 기본 공격은 전원 공통, 특수 능력은 게임당 1회 또는 쿨타임 제한).
+ */
+function nightOptionsFor(
+  player: Player,
+  round: number,
+): { canAttack: boolean; specialActions: NightActionType[] } {
+  if (!player.alive) return { canAttack: false, specialActions: [] };
+
+  const specialActions: NightActionType[] = [];
+  if (player.role === "boss" && !player.abilities.bossExecuteUsed) {
+    specialActions.push("boss_execute");
+  }
+  if (player.role === "bodyguard") {
+    const lastUsed = player.abilities.bodyguardShieldLastUsedRound;
+    const onCooldown = lastUsed !== null && round - lastUsed < 2;
+    if (!onCooldown) specialActions.push("bodyguard_shield");
+    if (!player.abilities.bodyguardOathUsed) specialActions.push("bodyguard_oath");
+  }
+  if (player.role === "spy" && !player.abilities.spyDisruptUsed) {
+    specialActions.push("spy_disrupt");
+  }
+  if (player.role === "traitor" && !player.abilities.traitorSmileUsed) {
+    specialActions.push("traitor_smile");
+  }
+  return { canAttack: true, specialActions };
+}
+
+function emitNightOptions(io: Server, room: Room) {
+  for (const player of room.players) {
+    if (!player.alive) continue;
+    io.to(player.id).emit("player:night_options", nightOptionsFor(player, room.round));
+  }
+}
+
+function emitSpyReveal(io: Server, room: Room) {
+  const spies = room.players.filter((p) => p.role === "spy");
+  for (const spy of spies) {
+    io.to(spy.id).emit("player:spy_reveal", {
+      teammates: spies.filter((s) => s.id !== spy.id).map((s) => s.nickname),
+    });
+  }
 }
 
 function clearPhaseTimer(room: Room) {
@@ -61,13 +116,25 @@ function endGame(io: Server, room: Room, winner: Role) {
 }
 
 function startNightPhase(io: Server, room: Room) {
-  room.nightTargets = {};
+  room.nightActions = {};
   scheduleTimedPhase(io, room, "night", () => resolveNight(io, room));
+  if (room.round === 1) {
+    // 03라운드진행.md: 1라운드 밤은 스파이 정체 확인 전용 정찰 라운드 - 공격/능력 불가.
+    emitSpyReveal(io, room);
+  } else {
+    emitNightOptions(io, room);
+  }
 }
 
 function resolveNight(io: Server, room: Room) {
-  const { updatedPlayers, damageLog } = resolveNightAttacks(room.players, room.nightTargets);
-  room.players = updatedPlayers;
+  let damageLog: ReturnType<typeof resolveNightAttacks>["damageLog"] = [];
+  if (room.round === 1) {
+    // 정찰 라운드: 전투 없음, 플레이어 상태 그대로 유지.
+  } else {
+    const result = resolveNightAttacks(room.players, room.nightActions, room.round);
+    room.players = result.updatedPlayers;
+    damageLog = result.damageLog;
+  }
   room.lastNightDamage = damageLog;
 
   const winner = checkWinner(room.players);
@@ -196,7 +263,14 @@ export function registerSocketHandlers(io: Server) {
           return callback({ ok: false, error: "이미 사용 중인 닉네임입니다." });
         }
 
-        room.players.push({ id: socket.id, nickname, role: null, hp: 0, alive: true });
+        room.players.push({
+          id: socket.id,
+          nickname,
+          role: null,
+          hp: 0,
+          alive: true,
+          abilities: defaultAbilityState(),
+        });
         data.roomCode = room.code;
         socket.join(room.code);
         callback({ ok: true, playerId: socket.id });
@@ -226,13 +300,19 @@ export function registerSocketHandlers(io: Server) {
       },
     );
 
-    socket.on("player:submit_night_target", (payload: { targetId: string }) => {
-      const room = data.roomCode ? getRoom(data.roomCode) : undefined;
-      if (!room || room.phase !== "night") return;
-      const player = room.players.find((p) => p.id === socket.id);
-      if (!player || !player.alive) return;
-      room.nightTargets[socket.id] = payload.targetId;
-    });
+    socket.on(
+      "player:submit_night_action",
+      (payload: { actionType: NightActionType; targetId?: string; shieldMode?: "absorb" | "halve" }) => {
+        const room = data.roomCode ? getRoom(data.roomCode) : undefined;
+        if (!room || room.phase !== "night" || room.round === 1) return;
+        const player = room.players.find((p) => p.id === socket.id);
+        if (!player || !player.alive) return;
+        const action: NightAction = { actionType: payload.actionType };
+        if (payload.targetId) action.targetId = payload.targetId;
+        if (payload.shieldMode) action.shieldMode = payload.shieldMode;
+        room.nightActions[socket.id] = action;
+      },
+    );
 
     socket.on("player:submit_vote", (payload: { targetId: string }) => {
       const room = data.roomCode ? getRoom(data.roomCode) : undefined;

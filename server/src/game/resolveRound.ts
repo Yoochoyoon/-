@@ -1,7 +1,7 @@
-import { DamageEntry, Player, Role } from "./types.js";
+import { DamageEntry, MAX_HP, NightAction, Player, Role } from "./types.js";
 
 function clonePlayers(players: Player[]): Player[] {
-  return players.map((p) => ({ ...p }));
+  return players.map((p) => ({ ...p, abilities: { ...p.abilities } }));
 }
 
 function applyDamage(players: Player[], damageByTarget: Map<string, number>): {
@@ -11,6 +11,7 @@ function applyDamage(players: Player[], damageByTarget: Map<string, number>): {
   const updatedPlayers = clonePlayers(players);
   const damageLog: DamageEntry[] = [];
   for (const [targetId, damage] of damageByTarget) {
+    if (damage <= 0) continue;
     const target = updatedPlayers.find((p) => p.id === targetId);
     if (!target || !target.alive) continue;
     target.hp -= damage;
@@ -23,21 +24,114 @@ function applyDamage(players: Player[], damageByTarget: Map<string, number>): {
   return { updatedPlayers, damageLog };
 }
 
+const BASE_DAMAGE = 1;
+const BOOSTED_DAMAGE = 2; // 긴급 처형(보스), 흑막의 미소(배신자) 적용 시 기본 공격 대신 사용
+
 /**
- * 밤 페이즈 해석: 생존자의 지목을 대상별로 합산해 데미지로 적용한다.
- * (04핵심메커니즘.md: 같은 대상을 여러 명이 지목하면 공격자 수만큼 합산)
+ * 밤 페이즈 해석 (2라운드 이후 전용 — 1라운드 정찰 라운드는 socketHandlers에서 별도 처리).
+ * 04핵심메커니즘.md 기준 처리 순서: 교란 작전(봉쇄) -> 방어/보호 -> 공격(합산) -> 회복/부가효과.
  */
 export function resolveNightAttacks(
   players: Player[],
-  targets: Record<string, string>,
+  actions: Record<string, NightAction>,
+  round: number,
 ): { updatedPlayers: Player[]; damageLog: DamageEntry[] } {
-  const damageByTarget = new Map<string, number>();
-  for (const [attackerId, targetId] of Object.entries(targets)) {
-    const attacker = players.find((p) => p.id === attackerId);
-    if (!attacker || !attacker.alive) continue;
-    damageByTarget.set(targetId, (damageByTarget.get(targetId) ?? 0) + 1);
+  const working = clonePlayers(players);
+  const byId = new Map(working.map((p) => [p.id, p]));
+
+  // 0단계: 교란 작전 - 침묵당한 대상은 이번 라운드 자신의 행동이 전부 무효화된다.
+  const silenced = new Set<string>();
+  for (const [attackerId, action] of Object.entries(actions)) {
+    if (action.actionType !== "spy_disrupt") continue;
+    const attacker = byId.get(attackerId);
+    if (!attacker || !attacker.alive || attacker.role !== "spy") continue;
+    if (attacker.abilities.spyDisruptUsed) continue;
+    if (!action.targetId) continue;
+    attacker.abilities.spyDisruptUsed = true;
+    silenced.add(action.targetId);
   }
-  return applyDamage(players, damageByTarget);
+
+  // 1단계: 방어/보호 효과 (육탄 방어, 충성심 서약)
+  const selfDamageNullified = new Set<string>();
+  const shieldByTarget = new Map<string, { mode: "absorb" | "halve"; bodyguardId: string }>();
+  for (const [attackerId, action] of Object.entries(actions)) {
+    if (silenced.has(attackerId)) continue;
+    const attacker = byId.get(attackerId);
+    if (!attacker || !attacker.alive || attacker.role !== "bodyguard") continue;
+
+    if (action.actionType === "bodyguard_oath") {
+      if (attacker.abilities.bodyguardOathUsed) continue;
+      attacker.abilities.bodyguardOathUsed = true;
+      selfDamageNullified.add(attackerId);
+    } else if (action.actionType === "bodyguard_shield") {
+      if (!action.targetId || !action.shieldMode) continue;
+      const lastUsed = attacker.abilities.bodyguardShieldLastUsedRound;
+      const onCooldown = lastUsed !== null && round - lastUsed < 2;
+      if (onCooldown) continue;
+      attacker.abilities.bodyguardShieldLastUsedRound = round;
+      shieldByTarget.set(action.targetId, { mode: action.shieldMode, bodyguardId: attackerId });
+    }
+  }
+
+  // 2단계: 공격 적용 (기본 공격 + 긴급 처형/흑막의 미소로 증폭된 공격) - 같은 대상 지목 시 합산
+  const rawDamageByTarget = new Map<string, number>();
+  const smileUserIds: string[] = [];
+  for (const [attackerId, action] of Object.entries(actions)) {
+    if (silenced.has(attackerId)) continue;
+    const attacker = byId.get(attackerId);
+    if (!attacker || !attacker.alive || !action.targetId) continue;
+
+    if (action.actionType === "attack") {
+      rawDamageByTarget.set(action.targetId, (rawDamageByTarget.get(action.targetId) ?? 0) + BASE_DAMAGE);
+    } else if (action.actionType === "boss_execute") {
+      if (attacker.role !== "boss" || attacker.abilities.bossExecuteUsed) continue;
+      attacker.abilities.bossExecuteUsed = true;
+      rawDamageByTarget.set(action.targetId, (rawDamageByTarget.get(action.targetId) ?? 0) + BOOSTED_DAMAGE);
+    } else if (action.actionType === "traitor_smile") {
+      if (attacker.role !== "traitor" || attacker.abilities.traitorSmileUsed) continue;
+      attacker.abilities.traitorSmileUsed = true;
+      smileUserIds.push(attackerId);
+      rawDamageByTarget.set(action.targetId, (rawDamageByTarget.get(action.targetId) ?? 0) + BOOSTED_DAMAGE);
+    }
+  }
+
+  // 3단계: 방어 효과를 반영해 최종 데미지 산출 (육탄 방어 흡수/경감, 충성심 서약 무효화)
+  const finalDamageByTarget = new Map<string, number>();
+  const addFinalDamage = (id: string, amount: number) => {
+    finalDamageByTarget.set(id, (finalDamageByTarget.get(id) ?? 0) + amount);
+  };
+  for (const [targetId, rawDamage] of rawDamageByTarget) {
+    let targetDamage = rawDamage;
+    const shield = shieldByTarget.get(targetId);
+    if (shield) {
+      if (shield.mode === "absorb") {
+        addFinalDamage(shield.bodyguardId, targetDamage);
+        targetDamage = 0;
+      } else {
+        targetDamage = Math.floor(targetDamage / 2);
+      }
+    }
+    if (selfDamageNullified.has(targetId)) targetDamage = 0;
+    addFinalDamage(targetId, targetDamage);
+  }
+
+  const aliveBefore = new Map(players.map((p) => [p.id, p.alive]));
+  const { updatedPlayers, damageLog } = applyDamage(working, finalDamageByTarget);
+
+  // 4단계: 회복/부가효과 - 흑막의 미소 (이번 라운드 사망자가 발생할 때마다 HP+2, 상한까지)
+  if (smileUserIds.length > 0) {
+    const deathCount = updatedPlayers.filter((p) => aliveBefore.get(p.id) === true && !p.alive).length;
+    if (deathCount > 0) {
+      for (const traitorId of smileUserIds) {
+        const traitor = updatedPlayers.find((p) => p.id === traitorId);
+        if (!traitor || !traitor.alive || !traitor.role) continue;
+        const cap = MAX_HP[traitor.role];
+        traitor.hp = Math.min(cap, traitor.hp + 2 * deathCount);
+      }
+    }
+  }
+
+  return { updatedPlayers, damageLog };
 }
 
 /**
