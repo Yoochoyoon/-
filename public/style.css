@@ -1,0 +1,72 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+  background: #12131a;
+  color: #f2f2f5;
+  min-height: 100vh;
+}
+.screen {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+h1 { font-size: 1.4rem; margin-bottom: 4px; }
+h2 { font-size: 1.1rem; color: #aeb3ff; }
+.muted { color: #9a9aa8; font-size: 0.9rem; }
+.card {
+  background: #1c1d29;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+}
+input, button {
+  font-size: 1rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #33344a;
+  background: #22233066;
+}
+input { width: 100%; color: #fff; margin-bottom: 8px; }
+button {
+  background: #5865f2;
+  color: white;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+button:disabled { background: #33344a; cursor: not-allowed; }
+button.secondary { background: #33344a; margin-top: 8px; }
+.error { color: #ff6b6b; min-height: 1.2em; font-size: 0.9rem; }
+.player-list { list-style: none; padding: 0; margin: 0; }
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #22233066;
+}
+.player-list li.selected { outline: 2px solid #5865f2; }
+.player-list li.dead { opacity: 0.4; text-decoration: line-through; }
+.player-list li button { width: auto; padding: 4px 10px; font-size: 0.85rem; }
+.timer { font-size: 2rem; font-weight: 700; text-align: center; margin: 8px 0; }
+.role-name { font-size: 1.6rem; font-weight: 700; }
+.hp-bar { height: 10px; border-radius: 6px; background: #33344a; overflow: hidden; margin-top: 4px; }
+.hp-bar > div { height: 100%; background: #f25858; }
+
+/* TV screen */
+.tv body, .tv .screen { max-width: none; }
+.tv-screen {
+  padding: 40px;
+  text-align: center;
+}
+.tv-screen h1 { font-size: 3rem; }
+.tv-screen .timer { font-size: 5rem; }
+.tv-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.tv-grid .card { text-align: left; }
