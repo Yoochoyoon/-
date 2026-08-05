@@ -13,7 +13,7 @@ import {
   MIN_PLAYERS,
   defaultAbilityState,
 } from "./game/types.js";
-import { createRoom, deleteRoom, getRoom } from "./rooms.js";
+import { createRoom, deleteRoom, getRoom, createSession, deleteSessionsByRoom } from "./rooms.js";
 
 interface SocketData {
   roomCode?: string;
@@ -250,7 +250,7 @@ export function registerSocketHandlers(io: Server) {
       "player:join_room",
       (
         payload: { code: string; nickname: string },
-        callback: (res: { ok: boolean; error?: string; playerId?: string }) => void,
+        callback: (res: { ok: boolean; error?: string; playerId?: string; sessionId?: string }) => void,
       ) => {
         const room = getRoom(payload.code ?? "");
         if (!room) return callback({ ok: false, error: "존재하지 않는 방 코드입니다." });
@@ -272,7 +272,8 @@ export function registerSocketHandlers(io: Server) {
         });
         data.roomCode = room.code;
         socket.join(room.code);
-        callback({ ok: true, playerId: socket.id });
+        const sessionId = createSession(socket.id, room.code);
+        callback({ ok: true, playerId: socket.id, sessionId });
         emitState(io, room);
       },
     );
