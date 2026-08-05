@@ -391,13 +391,24 @@ export function registerSocketHandlers(io: Server) {
     });
 
     socket.on("disconnect", () => {
-      const room = data.roomCode ? getRoom(data.roomCode) : undefined;
+      const roomCode = data.roomCode;
+      if (!roomCode) return;
+
+      const room = getRoom(roomCode);
       if (!room) return;
-      if (data.isHost && room.players.length === 0) {
-        deleteRoom(room.code);
-        return;
+
+      // 게임 진행 중이면 플레이어 유지 (재연결 대기)
+      // 로비 상태면 플레이어 제거
+      if (room.phase === "lobby") {
+        room.players = room.players.filter((p) => p.id !== socket.id);
+        emitState(io, room);
+
+        // 로비에서 모든 플레이어가 나가면 방 삭제
+        if (room.players.length === 0) {
+          deleteRoom(room.code);
+        }
       }
-      // MVP: 재접속 지원 없음. 연결이 끊긴 플레이어는 그대로 두고 게임은 계속 진행한다.
+      // 게임 진행 중: 플레이어 유지 (sessionId로 복귀 가능)
     });
   });
 }
