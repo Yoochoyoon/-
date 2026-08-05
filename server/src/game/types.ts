@@ -107,3 +107,10 @@ export const PHASE_DURATIONS_MS: Partial<Record<Phase, number>> = {
   day_discussion: 5 * 60 * 1000,
   day_vote: 2 * 60 * 1000,
 };
+
+export interface PlayerSession {
+  sessionId: string;
+  playerId: string;
+  roomCode: string;
+  createdAt: number;
+}
