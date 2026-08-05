@@ -1,5 +1,25 @@
 const socket = io();
 
+// 페이지 로드 시 자동 재연결 시도
+window.addEventListener("load", () => {
+  const sessionId = localStorage.getItem("sessionId");
+  const roomCode = localStorage.getItem("roomCode");
+
+  if (sessionId && roomCode) {
+    socket.emit("player:reconnect", { sessionId, roomCode }, (res) => {
+      if (res.ok) {
+        console.log("재연결 성공");
+        // 상태는 state:full_sync 이벤트로 받음
+      } else {
+        console.log("재연결 실패:", res.error);
+        // 세션 정보 삭제 (새로 입장해야 함)
+        localStorage.removeItem("sessionId");
+        localStorage.removeItem("roomCode");
+      }
+    });
+  }
+});
+
 // 07룰복잡도온보딩.md: 1~2라운드까지만 짧은 첫판 힌트를 보여주고, 3라운드부터는 자동으로 사라진다.
 const BEGINNER_HINTS = {
   night: "💡 지금은 밤이에요. 위에서 행동을 고르고 대상을 지목한 뒤 '지목 확정'을 누르세요.",
