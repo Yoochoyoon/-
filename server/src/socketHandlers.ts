@@ -405,6 +405,7 @@ export function registerSocketHandlers(io: Server) {
 
         // 로비에서 모든 플레이어가 나가면 방 삭제
         if (room.players.length === 0) {
+          deleteSessionsByRoom(room.code);
           deleteRoom(room.code);
         }
       }
