@@ -40,6 +40,7 @@ const ACTION_LABELS = {
 let myId = null;
 let myRole = null;
 let players = [];
+let myself = null;
 let currentPhase = "lobby";
 let currentRound = 0;
 let voteAllowedTargetIds = null;
@@ -199,6 +200,23 @@ socket.on("state:vote_result", ({ damageLog, tie, tiedTargetIds, finalTie }) => 
     showResult("🗳 투표 결과", [], finalTie ? "동점으로 이번 라운드는 데미지 없이 종료됩니다." : "동점! 동점자 중에서 재투표합니다.");
   } else {
     showResult("🗳 투표 결과", damageLog);
+  }
+});
+
+socket.on("state:full_sync", (data) => {
+  // 게임 상태 복원
+  players = data.players;
+  myself = players.find((p) => p.id === socket.id) || myself;
+
+  // 게임 진행 중이면 UI 업데이트
+  if (gameSection.style.display !== "none" && myself) {
+    document.getElementById("nicknameLabel").textContent = myself.nickname;
+
+    if (myself.role) {
+      const roleNames = { boss: "보스", bodyguard: "경호원", spy: "스파이", traitor: "배신자" };
+      document.getElementById("roleLabel").textContent = roleNames[myself.role] || myself.role;
+      document.getElementById("hpLabel").textContent = `HP ${myself.hp}/5`;
+    }
   }
 });
 
