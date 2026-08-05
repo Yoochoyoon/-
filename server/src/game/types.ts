@@ -80,16 +80,27 @@ export const MAX_HP: Record<Role, number> = {
   traitor: 4,
 };
 
-export const ROLE_COMPOSITION: Role[] = [
-  "boss",
-  "bodyguard",
-  "bodyguard",
-  "bodyguard",
-  "spy",
-  "spy",
-  "spy",
-  "traitor",
-];
+export const MIN_PLAYERS = 6;
+export const MAX_PLAYERS = 10;
+
+export const ROLE_COMPOSITIONS: Record<number, Role[]> = {
+  6: ["boss", "bodyguard", "bodyguard", "spy", "spy", "traitor"],
+  7: ["boss", "bodyguard", "bodyguard", "spy", "spy", "spy", "traitor"],
+  8: ["boss", "bodyguard", "bodyguard", "bodyguard", "spy", "spy", "spy", "traitor"],
+  9: ["boss", "bodyguard", "bodyguard", "bodyguard", "spy", "spy", "spy", "spy", "traitor"],
+  10: [
+    "boss",
+    "bodyguard",
+    "bodyguard",
+    "bodyguard",
+    "bodyguard",
+    "spy",
+    "spy",
+    "spy",
+    "spy",
+    "traitor",
+  ],
+};
 
 export const PHASE_DURATIONS_MS: Partial<Record<Phase, number>> = {
   night: 2 * 60 * 1000,

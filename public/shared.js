@@ -1,3 +1,6 @@
+const MIN_PLAYERS = 6;
+const MAX_PLAYERS = 10;
+
 const PHASE_LABELS = {
   lobby: "대기실",
   night: "🌙 밤 - 대상 지목",

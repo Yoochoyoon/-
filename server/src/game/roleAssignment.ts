@@ -1,4 +1,11 @@
-import { MAX_HP, Player, ROLE_COMPOSITION, defaultAbilityState } from "./types.js";
+import {
+  MAX_HP,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  Player,
+  ROLE_COMPOSITIONS,
+  defaultAbilityState,
+} from "./types.js";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -12,12 +19,13 @@ function shuffle<T>(items: T[]): T[] {
 export function assignRoles(
   players: { id: string; nickname: string }[],
 ): Player[] {
-  if (players.length !== ROLE_COMPOSITION.length) {
+  const composition = ROLE_COMPOSITIONS[players.length];
+  if (!composition) {
     throw new Error(
-      `MVP는 ${ROLE_COMPOSITION.length}명 고정입니다 (현재 ${players.length}명)`,
+      `인원수는 ${MIN_PLAYERS}~${MAX_PLAYERS}명 사이여야 합니다 (현재 ${players.length}명)`,
     );
   }
-  const roles = shuffle(ROLE_COMPOSITION);
+  const roles = shuffle(composition);
   return players.map((player, index) => {
     const role = roles[index];
     return {

@@ -66,9 +66,11 @@ socket.on("state:players", ({ players: ps }) => {
   renderPlayerList(document.getElementById("playerList"), players);
   renderPlayerList(document.getElementById("gamePlayerList"), players, { showHp: true });
   renderGrid();
-  document.getElementById("startBtn").disabled = players.length !== 8;
-  document.getElementById("startBtn").textContent =
-    players.length === 8 ? "시작" : `시작 (${players.length}/8명)`;
+  const validCount = players.length >= MIN_PLAYERS && players.length <= MAX_PLAYERS;
+  document.getElementById("startBtn").disabled = !validCount;
+  document.getElementById("startBtn").textContent = validCount
+    ? "시작"
+    : `시작 (${players.length}/${MIN_PLAYERS}~${MAX_PLAYERS}명)`;
 });
 
 socket.on("public:boss_revealed", ({ nickname }) => {

@@ -9,12 +9,11 @@ import {
   Player,
   Role,
   Room,
-  ROLE_COMPOSITION,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
   defaultAbilityState,
 } from "./game/types.js";
 import { createRoom, deleteRoom, getRoom } from "./rooms.js";
-
-const ROOM_SIZE = ROLE_COMPOSITION.length;
 
 interface SocketData {
   roomCode?: string;
@@ -256,7 +255,7 @@ export function registerSocketHandlers(io: Server) {
         const room = getRoom(payload.code ?? "");
         if (!room) return callback({ ok: false, error: "존재하지 않는 방 코드입니다." });
         if (room.phase !== "lobby") return callback({ ok: false, error: "이미 시작된 게임입니다." });
-        if (room.players.length >= ROOM_SIZE) return callback({ ok: false, error: "방이 가득 찼습니다 (8명)." });
+        if (room.players.length >= MAX_PLAYERS) return callback({ ok: false, error: `방이 가득 찼습니다 (최대 ${MAX_PLAYERS}명).` });
         const nickname = (payload.nickname ?? "").trim();
         if (!nickname) return callback({ ok: false, error: "닉네임을 입력해주세요." });
         if (room.players.some((p) => p.nickname === nickname)) {
@@ -283,8 +282,11 @@ export function registerSocketHandlers(io: Server) {
       (_payload, callback?: (res: { ok: boolean; error?: string }) => void) => {
         const room = data.roomCode ? getRoom(data.roomCode) : undefined;
         if (!room || !data.isHost) return callback?.({ ok: false, error: "진행자만 시작할 수 있습니다." });
-        if (room.players.length !== ROOM_SIZE) {
-          return callback?.({ ok: false, error: `${ROOM_SIZE}명이 모여야 시작할 수 있습니다.` });
+        if (room.players.length < MIN_PLAYERS || room.players.length > MAX_PLAYERS) {
+          return callback?.({
+            ok: false,
+            error: `${MIN_PLAYERS}~${MAX_PLAYERS}명이 모여야 시작할 수 있습니다 (현재 ${room.players.length}명).`,
+          });
         }
         room.players = assignRoles(room.players);
         room.round = 1;
