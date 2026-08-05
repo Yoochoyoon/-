@@ -13,7 +13,7 @@ import {
   MIN_PLAYERS,
   defaultAbilityState,
 } from "./game/types.js";
-import { createRoom, deleteRoom, getRoom, createSession, deleteSessionsByRoom } from "./rooms.js";
+import { createRoom, deleteRoom, getRoom, createSession, deleteSessionsByRoom, getSession } from "./rooms.js";
 
 interface SocketData {
   roomCode?: string;
@@ -275,6 +275,45 @@ export function registerSocketHandlers(io: Server) {
         const sessionId = createSession(socket.id, room.code);
         callback({ ok: true, playerId: socket.id, sessionId });
         emitState(io, room);
+      },
+    );
+
+    socket.on(
+      "player:reconnect",
+      (
+        payload: { sessionId: string; roomCode: string },
+        callback: (res: { ok: boolean; error?: string }) => void,
+      ) => {
+        const session = getSession(payload.sessionId);
+        if (!session) return callback({ ok: false, error: "세션을 찾을 수 없습니다." });
+        if (session.roomCode !== payload.roomCode) {
+          return callback({ ok: false, error: "방 코드가 일치하지 않습니다." });
+        }
+
+        const room = getRoom(session.roomCode);
+        if (!room) return callback({ ok: false, error: "방을 찾을 수 없습니다." });
+        if (room.phase === "lobby") {
+          return callback({ ok: false, error: "게임이 아직 시작되지 않았습니다." });
+        }
+
+        const player = room.players.find((p) => p.id === session.playerId);
+        if (!player) return callback({ ok: false, error: "플레이어를 찾을 수 없습니다." });
+
+        // 기존 socket 연결 대체
+        data.roomCode = room.code;
+        socket.join(room.code);
+
+        callback({ ok: true });
+        // 재연결한 플레이어에게만 현재 상태 전송
+        io.to(socket.id).emit("state:full_sync", {
+          players: room.players,
+          round: room.round,
+          phase: room.phase,
+          nightActions: room.nightActions,
+          dayVotes: room.dayVotes,
+          voteAllowedTargetIds: room.voteAllowedTargetIds,
+          phaseEndsAt: room.phaseEndsAt,
+        });
       },
     );
 
