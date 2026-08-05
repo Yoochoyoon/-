@@ -5,36 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>진행자 - 집중표적게임</title>
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    .host-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      gap: 12px;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    .tv-upper { flex: 2; overflow-y: auto; background: #1a1a2e; padding: 16px; border-radius: 8px; }
+    .control-lower { flex: 1; overflow-y: auto; background: #16213e; padding: 16px; border-radius: 8px; }
+    .tv-upper h1 { margin-top: 0; color: #e0e0e0; }
+    .tv-upper h2 { color: #e0e0e0; }
+    .tv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-top: 16px; }
+    .tv-player-card { background: #0f3460; padding: 12px; border-radius: 4px; text-align: center; border: 2px solid #533483; }
+    .tv-player-name { font-weight: 700; color: #e0e0e0; }
+    .tv-player-hp { font-size: 0.9rem; color: #aaa; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <div class="screen">
-    <h1>진행자 화면</h1>
+  <div class="host-layout">
+    <!-- TV 화면 (위쪽, 크게) -->
+    <div class="tv-upper">
+      <h1 id="titleLabel">집중표적게임</h1>
 
-    <div id="createSection" class="card">
-      <button id="createRoomBtn">방 만들기</button>
-    </div>
+      <div id="bossBanner" style="display:none; margin: 16px 0;">
+        <span class="muted">보스 공개</span>
+        <div id="bossName" style="font-size:2rem; font-weight:700; color:#f2c94c;"></div>
+      </div>
 
-    <div id="lobbySection" class="card" style="display:none">
-      <h2>방 코드: <span id="roomCode"></span></h2>
-      <p class="muted">플레이어들은 /player 에서 이 코드로 입장합니다.</p>
-      <ul id="playerList" class="player-list"></ul>
-      <button id="startBtn" disabled>시작 (8명 필요)</button>
-    </div>
-
-    <div id="gameSection" class="card" style="display:none">
       <h2 id="phaseLabel"></h2>
-      <div class="timer" id="timerLabel">--:--</div>
-      <ul id="gamePlayerList" class="player-list"></ul>
-      <button id="advanceBtn">다음 단계로 (강제 진행)</button>
-      <button id="extendBtn" class="secondary">시간 연장 (+1분)</button>
+      <div class="timer" id="timerLabel"></div>
+      <div id="resultLog" style="font-size:1.2rem; margin: 12px 0; color: #e0e0e0;"></div>
+      <div id="winnerLabel" style="font-size:1.5rem; font-weight:700; display:none; color:#f2c94c;"></div>
+
+      <div class="tv-grid" id="playerGrid"></div>
     </div>
 
-    <div id="overSection" class="card" style="display:none">
-      <h2>게임 종료</h2>
-      <p id="winnerLabel"></p>
-    </div>
+    <!-- 진행자 컨트롤 (아래쪽, 작게) -->
+    <div class="control-lower">
+      <div id="createSection">
+        <button id="createRoomBtn">방 만들기</button>
+      </div>
 
-    <p class="error" id="errorLabel"></p>
+      <div id="lobbySection" style="display:none">
+        <h3>방 코드: <span id="roomCode" style="color:#f2c94c; font-weight:700;"></span></h3>
+        <p class="muted">플레이어들은 /player 에서 이 코드로 입장합니다.</p>
+        <ul id="playerList" class="player-list"></ul>
+        <button id="startBtn" disabled>시작 (8명 필요)</button>
+      </div>
+
+      <div id="gameControlSection" style="display:none">
+        <ul id="gamePlayerList" class="player-list"></ul>
+        <div style="margin-top: 12px;">
+          <button id="advanceBtn">다음 단계로 (강제 진행)</button>
+          <button id="extendBtn" class="secondary">시간 연장 (+1분)</button>
+        </div>
+      </div>
+
+      <p class="error" id="errorLabel"></p>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
